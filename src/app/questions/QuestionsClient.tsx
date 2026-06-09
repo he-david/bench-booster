@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import StarRating from "@/components/StarRating";
+import { deleteQuestion } from "./actions";
 import type { QuestionRow } from "./page";
 
 const SENIORITY_ORDER = ["A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3", "B4"];
@@ -13,8 +14,10 @@ const selectClass =
 
 export default function QuestionsClient({
   questions,
+  isAdmin,
 }: {
   questions: QuestionRow[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [tech, setTech] = useState("all");
@@ -252,7 +255,14 @@ export default function QuestionsClient({
                   )}
                 </div>
               </button>
-              {isOpen && <RatePanel question={q} onSaved={refresh} />}
+              {isOpen && (
+                <RatePanel
+                  question={q}
+                  onSaved={refresh}
+                  isAdmin={isAdmin}
+                  onDeleted={refresh}
+                />
+              )}
             </article>
           );
         })}
@@ -309,9 +319,13 @@ function Tag({
 function RatePanel({
   question,
   onSaved,
+  isAdmin,
+  onDeleted,
 }: {
   question: QuestionRow;
   onSaved: () => void;
+  isAdmin: boolean;
+  onDeleted: () => void;
 }) {
   const [rating, setRating] = useState<number>(question.rating?.rating ?? 0);
   const [cameUp, setCameUp] = useState(question.rating?.cameUp ?? false);
@@ -320,6 +334,21 @@ function RatePanel({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteQuestion(question.id);
+      onDeleted();
+    } catch {
+      setDeleting(false);
+      setDeleteError("Could not delete the question. Please try again.");
+    }
+  }
 
   async function save() {
     if (rating === 0) return;
@@ -369,6 +398,22 @@ function RatePanel({
           />
         )}
 
+        {isAdmin && (
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmOpen(true);
+            }}
+            disabled={deleting}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-semibold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6" />
+            </svg>
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        )}
+
         <button
           onClick={save}
           disabled={saving || rating === 0}
@@ -391,6 +436,98 @@ function RatePanel({
             "Save"
           )}
         </button>
+      </div>
+
+      {confirmOpen && (
+        <ConfirmDeleteModal
+          questionText={question.text}
+          deleting={deleting}
+          error={deleteError}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={confirmDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({
+  questionText,
+  deleting,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  questionText: string;
+  deleting: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !deleting) onCancel();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [deleting, onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+    >
+      <div
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-fadeIn"
+        onClick={() => !deleting && onCancel()}
+      />
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 animate-fadeIn">
+        <div className="px-6 pt-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <path d="M12 9v4M12 17h.01" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2
+                id="delete-modal-title"
+                className="text-base font-semibold text-slate-900"
+              >
+                Delete question
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                This permanently removes the question and all of its ratings.
+                This cannot be undone.
+              </p>
+              <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 line-clamp-3">
+                {questionText}
+              </p>
+              {error && (
+                <p className="mt-3 text-sm font-medium text-red-600">{error}</p>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+          <button
+            onClick={onCancel}
+            disabled={deleting}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-red-500 to-red-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm shadow-red-600/30 transition hover:from-red-500 hover:to-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
       </div>
     </div>
   );

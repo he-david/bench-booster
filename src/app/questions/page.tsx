@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import QuestionsClient from "./QuestionsClient";
 import type { Seniority } from "@prisma/client";
 
@@ -20,6 +21,9 @@ export type QuestionRow = {
 };
 
 export default async function QuestionsPage() {
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const threeMonthsAgo = new Date();
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
@@ -46,5 +50,5 @@ export default async function QuestionsPage() {
     rating: null,
   }));
 
-  return <QuestionsClient questions={questions} />;
+  return <QuestionsClient questions={questions} isAdmin={isAdmin} />;
 }

@@ -1,34 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
+import { loginAction } from "./actions";
 
 export default function LoginPage() {
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const form = new FormData(e.currentTarget);
-    const result = await signIn("credentials", {
-      username: form.get("username"),
-      password: form.get("password"),
-      redirect: false,
-    });
-
-    setLoading(false);
-
-    if (result?.error) {
-      setError("Invalid username or password.");
-    } else {
-      router.push("/questions");
-    }
-  }
+  const [state, formAction, pending] = useActionState(loginAction, undefined);
 
   return (
     <div className="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12">
@@ -44,7 +20,7 @@ export default function LoginPage() {
           </span>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-              Welcome to Bench Booster
+              Welcome to Bench Boosterasd
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               Sign in to prepare for your next client interview.
@@ -53,7 +29,7 @@ export default function LoginPage() {
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          action={formAction}
           className="space-y-4 rounded-2xl border border-slate-200 bg-white/90 p-7 shadow-xl shadow-slate-900/5 backdrop-blur"
         >
           <div>
@@ -90,17 +66,17 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          {error && (
+          {state?.error && (
             <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {error}
+              {state.error}
             </div>
           )}
           <button
             type="submit"
-            disabled={loading}
+            disabled={pending}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-600/30 transition hover:from-indigo-500 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? (
+            {pending ? (
               <>
                 <svg
                   className="h-4 w-4 animate-spin"

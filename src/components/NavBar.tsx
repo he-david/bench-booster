@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { auth, signOut } from "@/lib/auth";
+import { signOut } from "next-auth/react";
+import type { Session } from "next-auth";
 import NavLinks from "./NavLinks";
 
 function initials(name: string | null | undefined) {
@@ -9,11 +12,10 @@ function initials(name: string | null | undefined) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default async function NavBar() {
-  const session = await auth();
+export default function NavBar({ session }: { session: Session | null }) {
   if (!session?.user) return null;
 
-  const isAdmin = session.user.role === "ADMIN";
+  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
 
   return (
     <nav className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70">
@@ -46,19 +48,13 @@ export default async function NavBar() {
               {session.user.name}
             </span>
           </div>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
-            <button
-              type="submit"
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
-            >
-              Sign out
-            </button>
-          </form>
+            Sign out
+          </button>
         </div>
       </div>
     </nav>

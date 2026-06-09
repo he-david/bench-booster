@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Seniority } from "@prisma/client";
@@ -31,4 +32,16 @@ export async function proposeQuestion(formData: FormData) {
   });
 
   redirect("/questions");
+}
+
+export async function deleteQuestion(id: string) {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") throw new Error("Unauthorized");
+
+  if (!id) throw new Error("Question id is required");
+
+  // Ratings are removed automatically via onDelete: Cascade.
+  await prisma.question.delete({ where: { id } });
+
+  revalidatePath("/questions");
 }
